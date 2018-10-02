@@ -1,5 +1,5 @@
-
-//here's my REPL Version 0.1
+#include "mpc.h" //Local header 
+//here's my REPL Version 0.2
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -36,14 +36,39 @@ void add_history(char* c){}
 #endif
 
 int main(int argc, char** argv){
-	
-		puts("YMT version 0.1");
+		//creating parsers
+		mpc_parser_t* Nbr = mpc_new("number");
+		mpc_parser_t* Operator = mpc_new("operator");
+		mpc_parser_t* Expr= mpc_new("expression");
+		mpc_parser_t* Lispy = mpc_new("lispy");
+
+		//Defining them with this language.
+		mpca_lang(MPCA_LANG_DEFAULT,
+			"                                                       			\
+				number   : /-?[0-9]+/ ;                             			\
+				operator : '+' | '-' | '*' | '/' | '%' |'a''d''d' | 'm''u''l' | 's''u''b' | 'd''e''v';\
+				expression     : <number> | '(' <operator> <expression>+ ')' ;  	\
+				lispy    : /^/ <operator> <expression>+ /$/ ;             		\
+	    		",
+			Nbr,Operator,Expr,Lispy);
+
+		puts("YMT version 0.2");
 		puts("Press Ctrl+c to exit\n");
 		while(1){
 			char* input=readline("YMT> ");
 			add_history(input);
-			
-			printf("Testing YMT version 0.1 : %s \n",input);
+			//Parsing the user's input 
+			mpc_result_t r;
+			if(mpc_parse("<stdin>",input,Lispy,&r)){ //calling mpc parse fct using Lispy parser
+				//accepted and perform the Abstracted segment tree (AST)
+				mpc_ast_print(r.output);
+				mpc_ast_delete(r.output);
+			}
+			else{
+				//the input doesn't start as it should be in Lispy
+				mpc_err_print(r.error);
+				mpc_err_delete(r.error);
+			}
 			free(input);
 		}
 	return 0;
