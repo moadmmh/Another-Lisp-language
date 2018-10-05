@@ -34,6 +34,36 @@ void add_history(char* c){}
 #include<editline/readline.h>
 #include<editline/history.h>
 #endif
+//a function to check which operation to perform
+long eval_op(long x, char* op, long y) {
+  if (strcmp(op, "+") == 0) { return x + y; }
+  if (strcmp(op, "-") == 0) { return x - y; }
+  if (strcmp(op, "*") == 0) { return x * y; }
+  if (strcmp(op, "/") == 0) { return x / y; }
+  if (strcmp(op, "%") == 0) { return x % y; }
+  if (strcmp(op, "^") == 0) { return pow(x,y);}
+  if (strcmp(op,"min")== 0) { return (x>y?y:x);}
+  if (strcmp(op,"max")== 0) { return (x>y?x:y);}  
+  return 0;
+}
+//getting the tree elements to evaluate the operations written 
+long eval(mpc_ast_t * t){
+		if(strstr(t->tag,"number")){
+			return atoi(t->contents);
+		}
+		char* op=t->children[1]->contents; //the operator in expression is always 2nd child the first one is '('
+		
+		long x=eval(t->children[2]); //storing the next child in x 
+		
+		//get the rest of the children starting from the 4th one if any 
+		
+		int idx=3;
+		while(strstr(t->children[idx]->tag,"expression")){
+			x=eval_op(x,op,eval(t->children[idx]));
+			++idx;
+		}
+		return x;
+}
 
 int main(int argc, char** argv){
 		//creating parsers
@@ -46,13 +76,15 @@ int main(int argc, char** argv){
 		mpca_lang(MPCA_LANG_DEFAULT,
 			"                                                       			\
 				number   : /-?[0-9]+/ ;                             			\
-				operator : '+' | '-' | '*' | '/' | '%' |'a''d''d' | 'm''u''l' | 's''u''b' | 'd''e''v';\
+				operator : '+' | '-' | '*' | '/' | '%' |'^'|\
+			  	\"min\" | \"max\";\
 				expression     : <number> | '(' <operator> <expression>+ ')' ;  	\
 				lispy    : /^/ <operator> <expression>+ /$/ ;             		\
 	    		",
 			Nbr,Operator,Expr,Lispy);
 
-		puts("YMT version 0.2");
+		puts("YMT version 0.3");
+		puts("Done By @moadmmh");
 		puts("Press Ctrl+c to exit\n");
 		while(1){
 			char* input=readline("YMT> ");
@@ -61,7 +93,8 @@ int main(int argc, char** argv){
 			mpc_result_t r;
 			if(mpc_parse("<stdin>",input,Lispy,&r)){ //calling mpc parse fct using Lispy parser
 				//accepted and perform the Abstracted segment tree (AST)
-				mpc_ast_print(r.output);
+				long result=eval(r.output);
+				printf("%li\n",result);
 				mpc_ast_delete(r.output);
 			}
 			else{
