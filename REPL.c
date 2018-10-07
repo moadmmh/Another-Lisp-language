@@ -1,5 +1,5 @@
 #include "mpc.h" //Local header 
-//here's my REPL Version 0.2
+//here's my REPL Version 0.4
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -34,35 +34,96 @@ void add_history(char* c){}
 #include<editline/readline.h>
 #include<editline/history.h>
 #endif
-//a function to check which operation to perform
-long eval_op(long x, char* op, long y) {
-  if (strcmp(op, "+") == 0) { return x + y; }
-  if (strcmp(op, "-") == 0) { return x - y; }
-  if (strcmp(op, "*") == 0) { return x * y; }
-  if (strcmp(op, "/") == 0) { return x / y; }
-  if (strcmp(op, "%") == 0) { return x % y; }
-  if (strcmp(op, "^") == 0) { return pow(x,y);}
-  if (strcmp(op,"min")== 0) { return (x>y?y:x);}
-  if (strcmp(op,"max")== 0) { return (x>y?x:y);}  
-  return 0;
+
+//an enumeration for possible errors
+enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
+
+//an enumeration for possible lisp value types
+enum{LVAL_NUM, LVAL_ERR };
+
+//the new structure lisp value (lval)
+typedef struct {
+	int type;
+	long num;
+	int err;
+}lval;
+
+//a number type lval
+lval lval_num(long x){
+	lval v;
+	v.type=LVAL_NUM;
+	v.num=x;
+	return v;
 }
+
+//an error type lval
+lval lval_err (int x){
+	lval v;
+	v.type=LVAL_ERR;
+	v.err=x;
+	return v;
+}
+
+//printing the lval 
+void lval_print(lval v){
+	switch(v.type){
+		case LVAL_NUM: 
+			printf("%li",v.num);
+			break;
+		case LVAL_ERR:
+			if(v.err==LERR_DIV_ZERO) {
+				printf("Error: Division by Zero !!");
+			}
+			else if(v.err== LERR_BAD_OP) {
+				printf("Error: Invalid Operator !!");
+			}
+			else if(v.err ==LERR_BAD_NUM) {
+				printf("Error :Invalid Number !!");
+			}
+			break;
+	}
+}
+
+// printing the lval followed by  a new line char 
+void lval_println(lval v){lval_print(v); putchar('\n');}
+
+//a function to check which operation to perform
+lval eval_op(lval x,char* op,lval y){
+	
+	//if the error in the numbers 
+	if(x.type== LVAL_ERR) return x;
+	if(y.type== LVAL_ERR) return y;
+	
+	//evaluating operations 
+	if (strcmp(op, "+") == 0) { return lval_num(y.num + x.num); }
+	if (strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }
+	if (strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
+	if (strcmp(op, "%") == 0) { return lval_num(x.num % y.num); }
+	if (strcmp(op, "/") == 0) { return (y.num==0 ? lval_err(LERR_DIV_ZERO): lval_num(x.num / y.num)); }
+	
+	//if the error belongs to the type of the operation entered by the user 
+	return lval_err(LERR_BAD_OP);
+}
+
 //getting the tree elements to evaluate the operations written 
-long eval(mpc_ast_t * t){
-		if(strstr(t->tag,"number")){
-			return atoi(t->contents);
-		}
-		char* op=t->children[1]->contents; //the operator in expression is always 2nd child the first one is '('
-		
-		long x=eval(t->children[2]); //storing the next child in x 
-		
-		//get the rest of the children starting from the 4th one if any 
-		
-		int idx=3;
-		while(strstr(t->children[idx]->tag,"expression")){
-			x=eval_op(x,op,eval(t->children[idx]));
-			++idx;
-		}
-		return x;
+lval eval(mpc_ast_t* t) {
+	
+	if(strstr(t->tag,"number")){
+		errno=0;
+		long x=strtol(t->contents, NULL,10);
+		return errno!=ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
+	}
+	
+	char* op=t->children[1]->contents;
+	lval x = eval(t->children[2]);
+	
+	int idx=3;
+	while(strstr(t->children[idx]->tag,"expression")){
+		x= eval_op(x,op,eval(t->children[idx]));
+		idx++;
+	}
+	 
+	return x;
 }
 
 int main(int argc, char** argv){
@@ -83,7 +144,7 @@ int main(int argc, char** argv){
 	    		",
 			Nbr,Operator,Expr,Lispy);
 
-		puts("YMT version 0.3");
+		puts("YMT version 0.4");
 		puts("Done By @moadmmh");
 		puts("Press Ctrl+c to exit\n");
 		while(1){
@@ -93,8 +154,8 @@ int main(int argc, char** argv){
 			mpc_result_t r;
 			if(mpc_parse("<stdin>",input,Lispy,&r)){ //calling mpc parse fct using Lispy parser
 				//accepted and perform the Abstracted segment tree (AST)
-				long result=eval(r.output);
-				printf("%li\n",result);
+				lval result=eval(r.output);
+				lval_println(result);
 				mpc_ast_delete(r.output);
 			}
 			else{
