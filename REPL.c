@@ -165,6 +165,7 @@ int main(int argc, char** argv){
 			}
 			free(input);
 		}
+		mpc_cleanup(4, Nbr, Operator, Expr, Lispy); //deleting the parser
 	return 0;
 }
 
